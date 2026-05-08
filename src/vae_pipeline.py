@@ -1,6 +1,7 @@
 import os, warnings
 import numpy as np
 import time
+import argparse
 
 
 from data_utils import (
@@ -26,14 +27,22 @@ from vae.vae_utils import (
 from visualize import plot_samples, plot_latent_space_samples, visualize_and_save_tsne
 
 
-def run_vae_pipeline(dataset_name: 'tail_samples_tec_2014_192', vae_type: str):
+def run_vae_pipeline(
+    input_path: str,
+    output_path: str,
+    window_size: int,
+    max_epochs: int,
+    vae_type: str,
+):
+    # Derive dataset_name from input file name (used for model saving and plots)
+    dataset_name = os.path.splitext(os.path.basename(input_path))[0]
+
     # ----------------------------------------------------------------------------------
     # Load data, perform train/valid split, scale data
 
     # read data
     # data = load_data(data_dir=paths.DATASETS_DIR, dataset=dataset_name)
-    csv_path = os.path.join(paths.DATASETS_DIR, f"{dataset_name}.csv")
-    data = load_csv_data(csv_path, window_size=704)
+    data = load_csv_data(input_path, window_size=window_size)
     # split data into train/valid splits
     train_data, valid_data = split_data(data, valid_perc=0.1, shuffle=True)
 
@@ -59,7 +68,7 @@ def run_vae_pipeline(dataset_name: 'tail_samples_tec_2014_192', vae_type: str):
     train_vae(
         vae=vae_model,
         train_data=scaled_train_data,
-        max_epochs=300,
+        max_epochs=max_epochs,
         verbose=1,
     )
 
@@ -115,11 +124,7 @@ def run_vae_pipeline(dataset_name: 'tail_samples_tec_2014_192', vae_type: str):
     # )
     save_generated_data_with_date(
         data=inverse_scaled_prior_samples,
-        output_file=os.path.join(
-            paths.GEN_DATA_DIR,
-            dataset_name,
-            f"timeVAE_samples.csv",
-        ),
+        output_file=output_path,
         start_year=2001,
         freq="2H",
         date_col="date",
@@ -144,11 +149,49 @@ def run_vae_pipeline(dataset_name: 'tail_samples_tec_2014_192', vae_type: str):
     # ----------------------------------------------------------------------------------
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run TimeVAE pipeline.")
+    parser.add_argument(
+        "-i", "--input_path",
+        type=str,
+        required=True,
+        help="Path to the input CSV dataset.",
+    )
+    parser.add_argument(
+        "-o", "--output_path",
+        type=str,
+        required=True,
+        help="Path to save the generated output CSV file.",
+    )
+    parser.add_argument(
+        "-w", "--window_size",
+        type=int,
+        default=704,
+        help="Window size (sample length). Default: 704",
+    )
+    parser.add_argument(
+        "-e", "--max_epochs",
+        type=int,
+        default=300,
+        help="Maximum number of training epochs. Default: 300",
+    )
+    parser.add_argument(
+        "-m", "--model",
+        type=str,
+        default="timeVAE",
+        choices=["vae_dense", "vae_conv", "timeVAE"],
+        help="VAE model type. Default: timeVAE",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    # check `/data/` for available datasets
-    dataset = "tail_samples_tec_2014_192"
+    args = parse_args()
 
-    # models: vae_dense, vae_conv, timeVAE
-    model_name = "timeVAE"
-
-    run_vae_pipeline(dataset, model_name)
+    run_vae_pipeline(
+        input_path=args.input_path,
+        output_path=args.output_path,
+        window_size=args.window_size,
+        max_epochs=args.max_epochs,
+        vae_type=args.model,
+    )
