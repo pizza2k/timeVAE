@@ -5,12 +5,14 @@ import time
 
 from data_utils import (
     load_yaml_file,
-    load_data,
+    load_csv_data,
+    save_generated_data_with_date,
     split_data,
     scale_data,
     inverse_transform_data,
     save_scaler,
-    save_data,
+    # load_data,
+    # save_data,
 )
 import paths
 from vae.vae_utils import (
@@ -24,13 +26,14 @@ from vae.vae_utils import (
 from visualize import plot_samples, plot_latent_space_samples, visualize_and_save_tsne
 
 
-def run_vae_pipeline(dataset_name: str, vae_type: str):
+def run_vae_pipeline(dataset_name: 'tail_samples_tec_2014_192', vae_type: str):
     # ----------------------------------------------------------------------------------
     # Load data, perform train/valid split, scale data
 
     # read data
-    data = load_data(data_dir=paths.DATASETS_DIR, dataset=dataset_name)
-
+    # data = load_data(data_dir=paths.DATASETS_DIR, dataset=dataset_name)
+    csv_path = os.path.join(paths.DATASETS_DIR, f"{dataset_name}.csv")
+    data = load_csv_data(csv_path, window_size=704)
     # split data into train/valid splits
     train_data, valid_data = split_data(data, valid_perc=0.1, shuffle=True)
 
@@ -56,7 +59,7 @@ def run_vae_pipeline(dataset_name: str, vae_type: str):
     train_vae(
         vae=vae_model,
         train_data=scaled_train_data,
-        max_epochs=1000,
+        max_epochs=300,
         verbose=1,
     )
 
@@ -103,12 +106,23 @@ def run_vae_pipeline(dataset_name: str, vae_type: str):
 
     # inverse transformer samples to original scale and save to dir
     inverse_scaled_prior_samples = inverse_transform_data(prior_samples, scaler)
-    save_data(
+    # save_data(
+    #     data=inverse_scaled_prior_samples,
+    #     output_file=os.path.join(
+    #         os.path.join(paths.GEN_DATA_DIR, dataset_name),
+    #         f"{vae_type}_{dataset_name}_prior_samples.npz",
+    #     ),
+    # )
+    save_generated_data_with_date(
         data=inverse_scaled_prior_samples,
         output_file=os.path.join(
-            os.path.join(paths.GEN_DATA_DIR, dataset_name),
-            f"{vae_type}_{dataset_name}_prior_samples.npz",
+            paths.GEN_DATA_DIR,
+            dataset_name,
+            f"timeVAE_samples.csv",
         ),
+        start_year=2001,
+        freq="2H",
+        date_col="date",
     )
 
     # ----------------------------------------------------------------------------------
@@ -132,7 +146,7 @@ def run_vae_pipeline(dataset_name: str, vae_type: str):
 
 if __name__ == "__main__":
     # check `/data/` for available datasets
-    dataset = "sine_subsampled_train_perc_20"
+    dataset = "tail_samples_tec_2014_192"
 
     # models: vae_dense, vae_conv, timeVAE
     model_name = "timeVAE"

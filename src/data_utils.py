@@ -2,9 +2,51 @@ import os
 import numpy as np
 import pickle
 import yaml
+import pandas as pd
 
 SCALER_FNAME = "scaler.pkl"
 
+def load_csv_data(file_path: str, window_size: int, stride: int = None) -> np.ndarray:
+    """
+    读取单条长序列 CSV，按 window_size 切分为样本。
+    stride 默认等于 window_size，即样本间不重叠。
+    """
+    df = pd.read_csv(file_path)
+    df = df.drop(columns=['date'])
+
+    data = df.select_dtypes(include=[np.number]).to_numpy()
+    
+    if stride is None:
+      stride = window_size
+    
+    n_windows = (len(data) - window_size) // stride + 1
+    windows = [
+      data[i * stride : i * stride + window_size]
+      for i in range(n_windows)
+    ]
+    return np.stack(windows)
+
+def save_generated_data_with_date(
+      data: np.ndarray,
+      output_file: str,
+      start_year: int = 2001,
+      freq: str = "2H",
+      date_col: str = "date",
+  ) -> None:
+    """
+    将生成的 (N, T, D) 样本拼接为长序列，添加 date 列后保存为 CSV。
+    date 从指定年份开始，按 freq 频率生成，放在第一列。
+    """
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
+    N, T, D = data.shape
+    flat_data = data.reshape(N * T, D)
+    
+    dates = pd.date_range(start=f"{start_year}-01-01", periods=N * T, freq=freq)
+    df = pd.DataFrame(flat_data)
+    df.insert(0, date_col, dates)
+    
+    df.to_csv(output_file, index=False)
 
 def load_yaml_file(file_path):
     with open(file_path, "r", encoding="utf-8") as file:
